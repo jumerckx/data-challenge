@@ -6,10 +6,36 @@ import psycopg2
 from startupradar.transformers.core import DomainTextTransformer, WhoisTransformer
 from startupradar.transformers.util.api import StartupRadarAPI
 
+from utils import *
 
-def cli():
+def cli(rating_threshold=5, keeptop=100):
     df = pd.read_parquet(".data/full.parquet")
-    print(df)
+
+    # Check for missing values in each column
+    missing_values = df.isnull().sum()
+
+    for (col, val) in zip(missing_values.keys(), missing_values.values):
+        if val > 0:
+            print(f"Column {col} is missing {val} entries.")
+    
+    # To find words that are correlated with highly-rated startups, 
+    # find most occuring words for highly-rated startups and discard 
+    # those words that also occur frequently for other startups.
+    df_filtered_good = df.loc[df['Rating'] >= rating_threshold]
+    words_good = []
+    for text in df_filtered_good.text:
+        words_good += split_text(text)
+    word_counts_good = get_word_counts(words_good, keeptop=keeptop)
+    
+    df_filtered_bad = df.loc[df['Rating'] < rating_threshold]
+    words_bad = []
+    for text in df_filtered_bad.text:
+        words_bad += split_text(text)
+    word_counts_bad = get_word_counts(words_bad, keeptop=keeptop)
+
+    for word_good in word_counts_good.keys():
+        if word_good not in word_counts_bad.keys():
+            print(f"{word_good}")
 
 
 def load_data():
