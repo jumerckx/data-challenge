@@ -3,6 +3,7 @@ import os
 
 import pandas as pd
 import psycopg2
+from sklearn.metrics import mean_squared_error
 from startupradar.transformers.core import DomainTextTransformer, WhoisTransformer
 from startupradar.transformers.util.api import StartupRadarAPI
 
@@ -36,6 +37,24 @@ def cli(rating_threshold=5, keeptop=100):
     for word_good in word_counts_good.keys():
         if word_good not in word_counts_bad.keys():
             print(f"{word_good}")
+    
+    X_train, X_test, y_train, y_test = prepare_data(df)
+    cv = get_cv()
+
+    cv.fit(X_train, y_train)
+
+    predictions_train = cv.best_estimator_.predict(X_train)
+    predictions_test = cv.best_estimator_.predict(X_test)
+
+    error_train = mean_squared_error(predictions_train, y_train)
+    error_test = mean_squared_error(predictions_test, y_test)
+
+    print(f"MSE\ttrain:\t{error_train}\n\ttest:\t{error_test}")
+
+    pd.DataFrame({"prediction": np.concatenate(
+        (predictions_train, predictions_test)),
+        "actual": np.concatenate((y_train, y_test))}).to_parquet("predictions.parquet")
+
 
 
 def load_data():
